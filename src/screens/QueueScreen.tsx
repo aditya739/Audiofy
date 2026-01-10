@@ -16,7 +16,17 @@ import { musicPlayer } from '../services/MusicPlayer';
 import { TrackData } from '../types';
 
 const QueueScreen = ({ navigation }: any) => {
-    const { queue, removeFromQueue, currentTrack, setCurrentTrack, setIsPlaying, clearQueue } = usePlayerStore();
+    const { queue, removeFromQueue, currentTrack, setCurrentTrack, setIsPlaying, clearQueue, theme } = usePlayerStore();
+
+    const colors = {
+        bg: theme === 'dark' ? '#0f0f0f' : '#ffffff',
+        text: theme === 'dark' ? '#fff' : '#000',
+        textSub: theme === 'dark' ? '#888' : '#666',
+        accent: '#1ED760',
+        card: theme === 'dark' ? '#1a1a1a' : '#f5f5f5',
+        activeCard: theme === 'dark' ? 'rgba(30, 215, 96, 0.1)' : 'rgba(30, 215, 96, 0.1)',
+        activeText: theme === 'dark' ? '#1ED760' : '#1ED760',
+    };
 
     const playFromQueue = async (track: TrackData) => {
         setCurrentTrack(track);
@@ -31,9 +41,9 @@ const QueueScreen = ({ navigation }: any) => {
     const renderItem = ({ item }: { item: TrackData }) => {
         const isActive = item.id === currentTrack?.id;
         return (
-            <View style={[styles.item, isActive && styles.activeItem]}>
+            <View style={[styles.item, { backgroundColor: colors.card }, isActive && { backgroundColor: colors.activeCard, borderColor: colors.accent, borderWidth: 1 }]}>
                 <View style={styles.grip}>
-                    <GripVertical size={20} color="#333" />
+                    <GripVertical size={20} color={colors.textSub} />
                 </View>
                 <TouchableOpacity
                     style={styles.itemContent}
@@ -41,33 +51,29 @@ const QueueScreen = ({ navigation }: any) => {
                 >
                     <Image source={{ uri: item.artwork }} style={styles.art} />
                     <View style={styles.info}>
-                        <Text style={[styles.title, isActive && styles.activeText]} numberOfLines={1}>{item.title}</Text>
-                        <Text style={styles.artist} numberOfLines={1}>{item.artist}</Text>
+                        <Text style={[styles.title, { color: isActive ? colors.activeText : colors.text }]} numberOfLines={1}>{item.title}</Text>
+                        <Text style={[styles.artist, { color: colors.textSub }]} numberOfLines={1}>{item.artist}</Text>
                     </View>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => removeTrack(item.id)} style={styles.removeBtn}>
-                    <Trash2 size={20} color={isActive ? '#1DB954' : '#666'} />
+                    <Trash2 size={20} color={isActive ? colors.accent : colors.textSub} />
                 </TouchableOpacity>
             </View>
         );
     };
 
     return (
-        <View style={styles.container}>
-            <StatusBar barStyle="light-content" />
-            <LinearGradient
-                colors={['#1a1a1a', '#000']}
-                style={StyleSheet.absoluteFillObject}
-            />
+        <View style={[styles.container, { backgroundColor: colors.bg }]}>
+            <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} />
 
             <SafeAreaView style={styles.safeArea}>
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                        <ChevronDown size={30} color="#fff" />
+                        <ChevronDown size={30} color={colors.text} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Playing Queue</Text>
+                    <Text style={[styles.headerTitle, { color: colors.text }]}>Playing Queue</Text>
                     <TouchableOpacity onPress={clearQueue}>
-                        <Text style={styles.clearBtn}>Clear</Text>
+                        <Text style={[styles.clearBtn, { color: colors.accent }]}>Clear</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -79,7 +85,7 @@ const QueueScreen = ({ navigation }: any) => {
                     showsVerticalScrollIndicator={false}
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyText}>Your queue is empty</Text>
+                            <Text style={[styles.emptyText, { color: colors.textSub }]}>Your queue is empty</Text>
                         </View>
                     }
                 />
@@ -109,12 +115,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     headerTitle: {
-        color: '#fff',
         fontSize: 18,
         fontWeight: 'bold',
     },
     clearBtn: {
-        color: '#1DB954',
         fontSize: 16,
         fontWeight: '600',
     },
@@ -127,13 +131,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 10,
         marginBottom: 10,
-        backgroundColor: 'rgba(255,255,255,0.03)',
         borderRadius: 12,
-    },
-    activeItem: {
-        backgroundColor: 'rgba(29, 185, 84, 0.1)',
-        borderColor: 'rgba(29, 185, 84, 0.3)',
-        borderWidth: 1,
     },
     grip: {
         paddingHorizontal: 10,
@@ -147,22 +145,16 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 6,
-        backgroundColor: '#222',
     },
     info: {
         flex: 1,
         marginLeft: 15,
     },
     title: {
-        color: '#fff',
         fontSize: 16,
         fontWeight: '600',
     },
-    activeText: {
-        color: '#1DB954',
-    },
     artist: {
-        color: '#999',
         fontSize: 14,
         marginTop: 2,
     },
@@ -175,7 +167,6 @@ const styles = StyleSheet.create({
         marginTop: 100,
     },
     emptyText: {
-        color: '#666',
         fontSize: 16,
     }
 });

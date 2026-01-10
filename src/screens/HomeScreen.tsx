@@ -3,80 +3,68 @@ import {
     View,
     Text,
     StyleSheet,
-    FlatList,
-    TextInput,
     TouchableOpacity,
     Image,
+    ScrollView,
+    Dimensions,
     ActivityIndicator,
     StatusBar,
-    ScrollView,
-    Dimensions
+    FlatList
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, Play, MoreVertical, Compass, Music, Clock } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { searchSongs, getTrending, getNewReleases } from '../api/saavn';
+import { Music, Search, Clock, Sun, Moon } from 'lucide-react-native';
+import { getTrending, getNewReleases } from '../api/saavn';
 import { Song, TrackData } from '../types';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { musicPlayer } from '../services/MusicPlayer';
 import MiniPlayer from '../components/MiniPlayer';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
+import FeaturedCard from '../components/home/FeaturedCard';
+import SectionHeader from '../components/home/SectionHeader';
+import HorizontalSongList from '../components/home/HorizontalSongList';
+import ArtistList from '../components/home/ArtistList';
+
 const HomeScreen = ({ navigation }: any) => {
-    const [query, setQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<Song[]>([]);
     const [trending, setTrending] = useState<Song[]>([]);
     const [newReleases, setNewReleases] = useState<Song[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [page, setPage] = useState(1);
+    const [loading, setLoading] = useState(true);
 
-    const { setCurrentTrack, addToQueue, setIsPlaying, recentPlays, addToRecentPlays } = usePlayerStore();
-
-    const getArtworkUrl = (images: any[]) => {
-        if (!images || images.length === 0) return '';
-        const highRes = images[images.length - 1];
-        return highRes?.link || highRes?.url || '';
-    };
+    const { setCurrentTrack, addToQueue, setIsPlaying, recentPlays, addToRecentPlays, theme, toggleTheme } = usePlayerStore();
 
     useEffect(() => {
-        loadInitialContent();
+        loadData();
     }, []);
 
-    const loadInitialContent = async () => {
+    const loadData = async () => {
+        console.log('🏠 [HomeScreen] loadData() called - fetching trending and new releases');
         setLoading(true);
-        const [trendingSongs, newSongs] = await Promise.all([
-            getTrending(),
-            getNewReleases()
-        ]);
-        setTrending(trendingSongs);
-        setNewReleases(newSongs);
-        setLoading(false);
-    };
-
-    const handleSearch = async (text: string) => {
-        setQuery(text);
-        if (text.length > 2) {
-            setLoading(true);
-            const results = await searchSongs(text, 1);
-            setSearchResults(results);
+        try {
+            const [t, n] = await Promise.all([getTrending(), getNewReleases()]);
+            console.log('🏠 [HomeScreen] Data loaded - Trending:', t.length, 'New Releases:', n.length);
+            setTrending(t);
+            setNewReleases(n);
+        } catch (e) {
+            console.error('❌ [HomeScreen] loadData() error:', e);
+        } finally {
             setLoading(false);
-        } else {
-            setSearchResults([]);
         }
     };
 
     const playSong = async (song: Song | TrackData) => {
+        console.log('🏠 [HomeScreen] playSong() called for:', 'downloadUrl' in song ? song.name : song.title);
         let track: TrackData;
-
         if ('downloadUrl' in song) {
+            const highRes = song.image[song.image.length - 1]; // Assuming Song has image array, verified in FeaturedCard extraction
             track = {
                 id: song.id,
                 url: song.downloadUrl[song.downloadUrl.length - 1].link || song.downloadUrl[song.downloadUrl.length - 1].url || '',
                 title: song.name,
-                artist: song.primaryArtists || 'Unknown Artist',
-                artistId: (song.primaryArtistsId || '').split(',')[0].trim(),
-                artwork: getArtworkUrl(song.image),
+                artist: (song.primaryArtists || 'Unknown Artist').toString().split(',')[0].trim(),
+                artistId: (song.primaryArtistsId || '').toString().split(',')[0].trim(),
+                artwork: highRes?.link || highRes?.url || '',
                 album: song.album.name,
                 duration: Number(song.duration),
             };
@@ -84,6 +72,7 @@ const HomeScreen = ({ navigation }: any) => {
             track = song;
         }
 
+        console.log('🏠 [HomeScreen] Setting track:', track.title, 'ID:', track.id);
         setCurrentTrack(track);
         addToQueue(track);
         addToRecentPlays(track);
@@ -91,308 +80,120 @@ const HomeScreen = ({ navigation }: any) => {
         await musicPlayer.play(track);
     };
 
-    const renderHorizontalItem = ({ item }: { item: Song }) => {
-        const artistId = (item.primaryArtistsId || '').split(',')[0].trim();
-        const artistName = (item.primaryArtists || '').split(',')[0].trim();
+    const colors = {
+        bg: theme === 'dark' ? '#0f0f0f' : '#ffffff',
+        text: theme === 'dark' ? '#fff' : '#000',
+        textSub: theme === 'dark' ? '#888' : '#666',
+        card: theme === 'dark' ? '#1a1a1a' : '#f5f5f5',
+        accent: '#1ED760',
+    };
 
-        const navigateToArtist = () => {
-            navigation.navigate('ArtistProfile', { artistId, artistName });
-        };
-
-        return (
-            <View style={styles.horizontalCard}>
-                <TouchableOpacity
-                    onPress={() => playSong(item)}
-                    activeOpacity={0.8}
-                >
-                    <Image
-                        source={{ uri: getArtworkUrl(item.image) }}
-                        style={styles.horizontalArt}
-                    />
-                    <Text style={styles.horizontalTitle} numberOfLines={1}>{item.name}</Text>
+    const renderHeader = () => (
+        <View style={[styles.header, { backgroundColor: colors.bg }]}>
+            <View>
+                <Text style={[styles.greeting, { color: colors.text }]}>Good Evening</Text>
+                <Text style={[styles.subGreeting, { color: colors.textSub }]}>Discover new music today</Text>
+            </View>
+            <View style={styles.headerActions}>
+                <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.card }]} onPress={() => navigation.navigate('Search')}>
+                    <Search size={22} color={colors.text} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={navigateToArtist}>
-                    <Text style={styles.horizontalArtist} numberOfLines={1}>{item.primaryArtists}</Text>
+                <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.card }]} onPress={toggleTheme}>
+                    {theme === 'dark' ? <Sun size={22} color="#FFD700" /> : <Moon size={22} color="#4A5568" />}
                 </TouchableOpacity>
             </View>
-        );
-    };
+        </View>
+    );
 
-    const renderSongItem = ({ item, index }: { item: Song | TrackData, index: number }) => {
-        const title = 'name' in item ? item.name : item.title;
-        const artist = 'primaryArtists' in item ? item.primaryArtists : item.artist;
-        const artistIdRaw = 'primaryArtistsId' in item ? item.primaryArtistsId : (item as any).artistId;
-        const artistId = (artistIdRaw || '').split(',')[0].trim();
-        const artwork = 'image' in item ? getArtworkUrl(item.image) : item.artwork;
-
-        const navigateToArtist = () => {
-            if (artistId) {
-                navigation.navigate('ArtistProfile', {
-                    artistId,
-                    artistName: (artist || '').split(',')[0].trim() || 'Artist'
-                });
-            }
-        };
-
+    if (loading && trending.length === 0) {
         return (
-            <TouchableOpacity
-                style={styles.songCard}
-                onPress={() => playSong(item)}
-                activeOpacity={0.7}
-                key={`${item.id}-${index}`}
-            >
-                <Image source={{ uri: artwork }} style={styles.albumArt} />
-                <View style={styles.songInfo}>
-                    <Text style={styles.songName} numberOfLines={1}>{title}</Text>
-                    <TouchableOpacity onPress={navigateToArtist}>
-                        <Text style={styles.artistName} numberOfLines={1}>{artist}</Text>
-                    </TouchableOpacity>
-                </View>
-                <TouchableOpacity style={styles.moreButton}>
-                    <Play size={18} color="#1DB954" fill="#1DB954" />
-                </TouchableOpacity>
-            </TouchableOpacity>
+            <View style={[styles.loadingContainer, { backgroundColor: colors.bg }]}>
+                <ActivityIndicator size="large" color="#1ED760" />
+            </View>
         );
-    };
+    }
 
     return (
-        <View style={styles.container}>
-            <StatusBar barStyle="light-content" />
-            <LinearGradient
-                colors={['#1a1a1a', '#000000']}
-                style={styles.background}
-            />
+        <View style={[styles.container, { backgroundColor: colors.bg }]}>
+            <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} />
+            <SafeAreaView style={styles.safeArea} edges={['top']}>
+                {renderHeader()}
 
-            <SafeAreaView style={styles.safeArea}>
-                <View style={styles.header}>
-                    <View>
-                        <Text style={styles.greeting}>Good Evening</Text>
-                        <Text style={styles.title}>Browse Music</Text>
-                    </View>
-                    <TouchableOpacity style={styles.profileButton}>
-                        <View style={styles.profilePlaceholder} />
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.searchContainer}>
-                    <View style={styles.searchBar}>
-                        <Search size={20} color="#666" style={styles.searchIcon} />
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder="Search songs, artists..."
-                            placeholderTextColor="#666"
-                            value={query}
-                            onChangeText={handleSearch}
-                        />
-                    </View>
-                </View>
-
-                {query.length > 2 ? (
-                    <FlatList
-                        data={searchResults}
-                        keyExtractor={(item, index) => `${item.id}-${index}`}
-                        renderItem={({ item, index }) => renderSongItem({ item, index })}
-                        contentContainerStyle={styles.list}
-                        showsVerticalScrollIndicator={false}
-                        ListFooterComponent={loading ? <ActivityIndicator color="#1DB954" style={{ margin: 20 }} /> : null}
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+                    {/* Featured Section */}
+                    <FeaturedCard
+                        item={newReleases[0] || null}
+                        onPlay={playSong}
                     />
-                ) : (
-                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-                        {recentPlays.length > 0 && (
-                            <View style={styles.section}>
-                                <View style={styles.sectionHeader}>
-                                    <Clock size={20} color="#1DB954" />
-                                    <Text style={styles.sectionTitle}>Recently Played</Text>
-                                </View>
-                                <FlatList
-                                    horizontal
-                                    data={recentPlays}
-                                    keyExtractor={(item, index) => `recent-${item.id}-${index}`}
-                                    renderItem={({ item }) => (
-                                        <TouchableOpacity
-                                            style={styles.horizontalCard}
-                                            onPress={() => playSong(item)}
-                                        >
-                                            <Image source={{ uri: item.artwork }} style={styles.horizontalArt} />
-                                            <Text style={styles.horizontalTitle} numberOfLines={1}>{item.title}</Text>
-                                        </TouchableOpacity>
-                                    )}
-                                    showsHorizontalScrollIndicator={false}
-                                />
-                            </View>
-                        )}
 
+                    {/* Recently Played */}
+                    {recentPlays.length > 0 && (
                         <View style={styles.section}>
-                            <View style={styles.sectionHeader}>
-                                <Compass size={20} color="#1DB954" />
-                                <Text style={styles.sectionTitle}>Trending Now</Text>
-                            </View>
-                            <FlatList
-                                horizontal
-                                data={trending}
-                                keyExtractor={(item, index) => `trending-${item.id}-${index}`}
-                                renderItem={renderHorizontalItem}
-                                showsHorizontalScrollIndicator={false}
+                            <SectionHeader
+                                title="Recently Played"
+                                rightElement={<Clock size={20} color={colors.accent} />}
+                            />
+                            <HorizontalSongList
+                                data={recentPlays}
+                                onPlay={playSong}
+                                variant="recent"
                             />
                         </View>
+                    )}
 
-                        <View style={styles.section}>
-                            <View style={styles.sectionHeader}>
-                                <Music size={20} color="#1DB954" />
-                                <Text style={styles.sectionTitle}>New Releases</Text>
-                            </View>
-                            <View style={{ paddingHorizontal: 20 }}>
-                                {newReleases.map((item, index) => renderSongItem({ item, index }))}
-                            </View>
-                        </View>
-                    </ScrollView>
-                )}
+                    {/* Trending Section */}
+                    <View style={styles.section}>
+                        <SectionHeader
+                            title="Trending Now"
+                            rightElement={
+                                <TouchableOpacity>
+                                    <Text style={[styles.seeAll, { color: colors.accent }]}>See All</Text>
+                                </TouchableOpacity>
+                            }
+                        />
+                        <HorizontalSongList
+                            data={trending}
+                            onPlay={playSong}
+                            variant="trending"
+                        />
+                    </View>
+
+                    {/* Popular Artists */}
+                    <View style={styles.section}>
+                        <SectionHeader title="Artists for You" />
+                        <ArtistList
+                            data={trending}
+                            navigation={navigation}
+                        />
+                    </View>
+
+                    {/* Extra Spacing for MiniPlayer */}
+                    <View style={{ height: 160 }} />
+                </ScrollView>
             </SafeAreaView>
-
             <MiniPlayer navigation={navigation} />
         </View>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#000',
-    },
-    background: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-    },
-    safeArea: {
-        flex: 1,
-    },
+    container: { flex: 1, backgroundColor: '#0f0f0f' },
+    loadingContainer: { flex: 1, backgroundColor: '#0f0f0f', justifyContent: 'center', alignItems: 'center' },
+    safeArea: { flex: 1 },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingTop: 20,
-        paddingBottom: 10,
+        paddingVertical: 15,
     },
-    greeting: {
-        color: '#999',
-        fontSize: 14,
-        fontWeight: '500',
-    },
-    title: {
-        color: '#fff',
-        fontSize: 28,
-        fontWeight: 'bold',
-    },
-    profileButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        overflow: 'hidden',
-        backgroundColor: '#333',
-    },
-    profilePlaceholder: {
-        flex: 1,
-        backgroundColor: '#1DB954',
-    },
-    searchContainer: {
-        paddingHorizontal: 20,
-        marginVertical: 15,
-    },
-    searchBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        borderRadius: 12,
-        paddingHorizontal: 15,
-        height: 50,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    searchIcon: {
-        marginRight: 10,
-    },
-    searchInput: {
-        flex: 1,
-        color: '#fff',
-        fontSize: 16,
-    },
-    scrollContent: {
-        paddingBottom: 120,
-    },
-    list: {
-        paddingHorizontal: 20,
-        paddingBottom: 120,
-    },
-    section: {
-        marginBottom: 30,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        marginBottom: 15,
-    },
-    sectionTitle: {
-        color: '#fff',
-        fontSize: 20,
-        fontWeight: 'bold',
-        marginLeft: 10,
-    },
-    horizontalCard: {
-        width: 140,
-        marginLeft: 20,
-    },
-    horizontalArt: {
-        width: 140,
-        height: 140,
-        borderRadius: 12,
-        marginBottom: 8,
-        backgroundColor: '#222',
-    },
-    horizontalTitle: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    horizontalArtist: {
-        color: '#999',
-        fontSize: 12,
-    },
-    songCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-        borderRadius: 12,
-        padding: 8,
-    },
-    albumArt: {
-        width: 56,
-        height: 56,
-        borderRadius: 8,
-        backgroundColor: '#222',
-    },
-    songInfo: {
-        flex: 1,
-        marginLeft: 15,
-    },
-    songName: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    artistName: {
-        color: '#999',
-        fontSize: 14,
-    },
-    moreButton: {
-        padding: 10,
-    }
+    greeting: { fontSize: 24, fontWeight: 'bold' },
+    subGreeting: { fontSize: 13, marginTop: 2 },
+    headerActions: { flexDirection: 'row' },
+    headerBtn: { marginLeft: 15, width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+    scrollContent: { paddingTop: 10 },
+    section: { marginBottom: 30 },
+    seeAll: { fontSize: 13 },
 });
 
 export default HomeScreen;

@@ -46,6 +46,11 @@ export interface Song {
     copyright: string;
     image: Image[];
     downloadUrl: DownloadUrl[];
+    artists?: {
+        primary: Artist[];
+        featured: Artist[];
+        all: Artist[];
+    };
 }
 
 export interface SearchResponse {

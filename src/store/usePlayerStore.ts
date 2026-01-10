@@ -11,6 +11,8 @@ interface PlayerState {
     shuffle: boolean;
     downloads: string[];
     recentPlays: TrackData[];
+    favorites: TrackData[];
+    theme: 'dark' | 'light';
 
     // Actions
     setCurrentTrack: (track: TrackData | null) => void;
@@ -23,11 +25,14 @@ interface PlayerState {
     clearQueue: () => void;
     toggleDownload: (trackId: string) => void;
     addToRecentPlays: (track: TrackData) => void;
+    toggleFavorite: (track: TrackData) => void;
+    isFavorite: (trackId: string) => boolean;
+    toggleTheme: () => void;
 }
 
 export const usePlayerStore = create<PlayerState>()(
     persist(
-        (set) => ({
+        (set, get) => ({
             currentTrack: null,
             queue: [],
             isPlaying: false,
@@ -35,6 +40,8 @@ export const usePlayerStore = create<PlayerState>()(
             shuffle: false,
             downloads: [],
             recentPlays: [],
+            favorites: [],
+            theme: 'dark',
 
             setCurrentTrack: (track) => set({ currentTrack: track }),
             setQueue: (queue) => set({ queue }),
@@ -55,8 +62,22 @@ export const usePlayerStore = create<PlayerState>()(
             })),
             addToRecentPlays: (track) => set((state) => {
                 const filtered = state.recentPlays.filter(t => t.id !== track.id);
-                return { recentPlays: [track, ...filtered].slice(0, 10) };
+                return { recentPlays: [track, ...filtered].slice(0, 20) };
             }),
+            toggleFavorite: (track) => set((state) => {
+                const isFav = state.favorites.find(f => f.id === track.id);
+                if (isFav) {
+                    return { favorites: state.favorites.filter(f => f.id !== track.id) };
+                } else {
+                    return { favorites: [track, ...state.favorites] };
+                }
+            }),
+            isFavorite: (trackId) => {
+                return !!get().favorites.find(f => f.id === trackId);
+            },
+            toggleTheme: () => set((state) => ({
+                theme: state.theme === 'dark' ? 'light' : 'dark'
+            })),
         }),
         {
             name: 'player-storage',
@@ -67,6 +88,8 @@ export const usePlayerStore = create<PlayerState>()(
                 shuffle: state.shuffle,
                 downloads: state.downloads,
                 recentPlays: state.recentPlays,
+                favorites: state.favorites,
+                theme: state.theme,
             }),
         }
     )

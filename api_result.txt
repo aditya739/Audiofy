@@ -1,0 +1,8 @@
+Checking: /songs/0W6DtW_N/suggestions
+  NO. Failed for /songs/0W6DtW_N/suggestions: 500
+Checking: /songs/0W6DtW_N/recommendations
+  NO. Failed for /songs/0W6DtW_N/recommendations: 404
+Checking: /search/songs?query=pop
+  YES! Success for /search/songs?query=pop
+Checking: /recommend/songs?id=0W6DtW_N
+  NO. Failed for /recommend/songs?id=0W6DtW_N: 404

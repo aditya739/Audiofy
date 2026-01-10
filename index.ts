@@ -1,8 +1,18 @@
+import 'react-native-gesture-handler';
 import { registerRootComponent } from 'expo';
-
 import App from './App';
+import Constants from 'expo-constants';
 
-// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
-// It also ensures that whether you load the app in Expo Go or in a native build,
-// the environment is set up appropriately
+const isExpoGo = Constants.appOwnership === 'expo';
+
+if (!isExpoGo) {
+    try {
+        const { TrackPlayer } = require('./src/services/SafeTrackPlayer');
+        const { PlaybackService } = require('./src/services/PlaybackService');
+        TrackPlayer.registerPlaybackService(() => PlaybackService);
+    } catch (e) {
+        console.log('Registering PlaybackService failed');
+    }
+}
+
 registerRootComponent(App);

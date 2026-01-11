@@ -11,7 +11,7 @@ if (!isExpoGo) {
         const { PlaybackService } = require('./src/services/PlaybackService');
         TrackPlayer.registerPlaybackService(() => PlaybackService);
     } catch (e) {
-        console.log('Registering PlaybackService failed');
+
     }
 }
 

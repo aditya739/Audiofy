@@ -5,7 +5,7 @@ const isExpoGo = Constants.appOwnership === 'expo';
 
 export const setupPlayer = async () => {
     if (isExpoGo) {
-        console.log('Running in Expo Go: TrackPlayer setup skipped.');
+
         return true;
     }
 

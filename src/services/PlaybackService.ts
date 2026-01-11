@@ -14,6 +14,6 @@ export const PlaybackService = async function () {
         TrackPlayer.addEventListener(Event.RemoteStop, () => TrackPlayer.reset());
         TrackPlayer.addEventListener(Event.RemoteSeek, (event: any) => TrackPlayer.seekTo(event.position));
     } catch (e) {
-        console.log('PlaybackService event registration failed');
+
     }
 };

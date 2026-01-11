@@ -64,7 +64,7 @@ export const useSafeProgress = () => {
                     setMockProgress({ ...p, buffered: 0 });
                 });
             } catch (e) {
-                console.log('Progress subscription failed');
+
             }
         }
     }, []);

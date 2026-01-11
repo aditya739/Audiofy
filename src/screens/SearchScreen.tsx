@@ -10,11 +10,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search as SearchIcon, ChevronRight } from 'lucide-react-native';
-import { searchSongs, searchArtists } from '../api/saavn';
+import { saavnApi } from '../api/SaavnApi';
 import { Song, TrackData } from '../types';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { musicPlayer } from '../services/MusicPlayer';
 import MiniPlayer from '../components/MiniPlayer';
+import Logger from '../utils/Logger';
+import { ErrorHandler } from '../utils/ErrorHandler';
+import SongConverter from '../utils/SongConverter';
+
+const logger = Logger.getInstance('SearchScreen');
 
 // Components
 import SearchBar from '../components/search/SearchBar';
@@ -44,15 +49,34 @@ const SearchScreen = ({ navigation }: any) => {
 
     const handleSearch = async (text: string) => {
         setQuery(text);
+
         if (text.length > 2) {
+            logger.group('Search');
+            logger.info('Searching', { query: text });
+            logger.time('search');
             setLoading(true);
-            const [songs, artists] = await Promise.all([
-                searchSongs(text),
-                searchArtists(text)
-            ]);
-            setSongResults(songs);
-            setArtistResults(artists);
-            setLoading(false);
+
+            try {
+                const [songs, artists] = await Promise.all([
+                    saavnApi.searchSongs(text),
+                    saavnApi.searchArtists(text)
+                ]);
+
+                logger.info('Search completed', {
+                    songs: songs.length,
+                    artists: artists.length
+                });
+
+                setSongResults(songs);
+                setArtistResults(artists);
+            } catch (error) {
+                logger.error('Search failed', error);
+                ErrorHandler.handle(error, 'SearchScreen.handleSearch');
+            } finally {
+                setLoading(false);
+                logger.timeEnd('search');
+                logger.groupEnd();
+            }
         } else {
             setSongResults([]);
             setArtistResults([]);
@@ -66,23 +90,21 @@ const SearchScreen = ({ navigation }: any) => {
     };
 
     const playSong = async (song: Song) => {
-        const highRes = song.image[song.image.length - 1];
-        const track: TrackData = {
-            id: song.id,
-            url: song.downloadUrl[song.downloadUrl.length - 1].link || song.downloadUrl[song.downloadUrl.length - 1].url || '',
-            title: song.name,
-            artist: (song.primaryArtists || 'Unknown Artist').toString().split(',')[0].trim(),
-            artistId: (song.primaryArtistsId || '').toString().split(',')[0].trim(),
-            artwork: highRes?.link || highRes?.url || '',
-            album: song.album.name,
-            duration: Number(song.duration),
-        };
+        logger.info('Playing song from search', { title: song.name });
 
-        setCurrentTrack(track);
-        addToQueue(track);
-        addToRecentPlays(track);
-        setIsPlaying(true);
-        await musicPlayer.play(track);
+        try {
+            // Use SongConverter to convert Song to TrackData
+            const track = SongConverter.toTrackData(song);
+
+            setCurrentTrack(track);
+            addToQueue(track);
+            addToRecentPlays(track);
+            setIsPlaying(true);
+            await musicPlayer.play(track);
+        } catch (error) {
+            logger.error('Failed to play song', error);
+            ErrorHandler.handle(error, 'SearchScreen.playSong');
+        }
     };
 
     const navigateToArtist = (artist: any) => {

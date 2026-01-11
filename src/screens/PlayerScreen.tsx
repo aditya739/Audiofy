@@ -11,8 +11,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useSafePlaybackState, useSafeProgress } from '../hooks/usePlayer';
 import { musicPlayer } from '../services/MusicPlayer';
-import { getSuggestions } from '../api/saavn';
+import { saavnApi } from '../api/SaavnApi';
 import { Song, TrackData } from '../types';
+import Logger from '../utils/Logger';
+import { ErrorHandler } from '../utils/ErrorHandler';
+import SongConverter from '../utils/SongConverter';
+
+const logger = Logger.getInstance('PlayerScreen');
 
 // Components
 import PlayerHeader from '../components/player/PlayerHeader';
@@ -21,7 +26,6 @@ import SongInfo from '../components/player/SongInfo';
 import ProgressBar from '../components/player/ProgressBar';
 import PlayerControls from '../components/player/PlayerControls';
 import SimilarSongsList from '../components/player/SimilarSongsList';
-import PlayerFooter from '../components/player/PlayerFooter';
 
 const PlayerScreen = ({ navigation }: any) => {
     const {
@@ -39,7 +43,9 @@ const PlayerScreen = ({ navigation }: any) => {
         addToRecentPlays,
         theme,
         toggleFavorite,
-        isFavorite
+        isFavorite,
+        playNext,
+        playPrevious
     } = usePlayerStore();
 
     const [similarSongs, setSimilarSongs] = useState<Song[]>([]);
@@ -78,9 +84,20 @@ const PlayerScreen = ({ navigation }: any) => {
     }, [currentTrack?.id]);
 
     const fetchSimilar = async () => {
-        if (currentTrack) {
-            const suggestions = await getSuggestions(currentTrack.id);
+        if (!currentTrack) return;
+
+        logger.group('Fetch Similar Songs');
+        logger.info('Fetching suggestions', { trackId: currentTrack.id });
+
+        try {
+            const suggestions = await saavnApi.getSuggestions(currentTrack.id);
+            logger.info('Suggestions loaded', { count: suggestions.length });
             setSimilarSongs(suggestions);
+        } catch (error) {
+            logger.error('Failed to fetch suggestions', error);
+            ErrorHandler.handle(error, 'PlayerScreen.fetchSimilar');
+        } finally {
+            logger.groupEnd();
         }
     };
 
@@ -93,25 +110,22 @@ const PlayerScreen = ({ navigation }: any) => {
     };
 
     const playSimilar = async (song: Song) => {
-        console.log('🎵 [PlayerScreen] playSimilar() called for:', song.name);
-        const { name: artistName, id: artistId } = getArtistInfo(song);
-        const track: TrackData = {
-            id: song.id,
-            url: song.downloadUrl[song.downloadUrl.length - 1].link || song.downloadUrl[song.downloadUrl.length - 1].url || '',
-            title: song.name,
-            artist: artistName,
-            artistId: (artistId || '').toString().split(',')[0].trim(),
-            artwork: getImageUrl(song.image),
-            album: song.album.name,
-            duration: Number(song.duration),
-        };
+        logger.info('Playing similar song', { title: song.name });
 
-        console.log('🎵 [PlayerScreen] Setting similar track:', track.title, 'ID:', track.id);
-        setCurrentTrack(track);
-        addToQueue(track);
-        addToRecentPlays(track);
-        setIsPlaying(true);
-        await musicPlayer.play(track);
+        try {
+            // Use SongConverter to convert Song to TrackData
+            const track = SongConverter.toTrackData(song);
+
+            logger.debug('Setting similar track', { title: track.title, id: track.id });
+            setCurrentTrack(track);
+            addToQueue(track);
+            addToRecentPlays(track);
+            setIsPlaying(true);
+            await musicPlayer.play(track);
+        } catch (error) {
+            logger.error('Failed to play similar song', error);
+            ErrorHandler.handle(error, 'PlayerScreen.playSimilar');
+        }
     };
 
     const handleSeek = async (value: number) => {
@@ -119,42 +133,13 @@ const PlayerScreen = ({ navigation }: any) => {
     };
 
     const skipToNext = async () => {
-        const { queue, currentTrack, setCurrentTrack, setIsPlaying, addToRecentPlays } = usePlayerStore.getState();
-        if (queue.length === 0 || !currentTrack) return;
-
-        const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
-        let nextTrack;
-
-        if (shuffle) {
-            const randomIndex = Math.floor(Math.random() * queue.length);
-            nextTrack = queue[randomIndex];
-        } else {
-            const nextIndex = (currentIndex + 1) % queue.length;
-            nextTrack = queue[nextIndex];
-        }
-
-        if (nextTrack) {
-            setCurrentTrack(nextTrack);
-            addToRecentPlays(nextTrack);
-            setIsPlaying(true);
-            await musicPlayer.play(nextTrack);
-        }
+        logger.info('Skipping to next track');
+        await playNext(false);
     };
 
     const skipToPrevious = async () => {
-        const { queue, currentTrack, setCurrentTrack, setIsPlaying, addToRecentPlays } = usePlayerStore.getState();
-        if (queue.length === 0 || !currentTrack) return;
-
-        const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
-        const prevIndex = (currentIndex - 1 + queue.length) % queue.length;
-        const prevTrack = queue[prevIndex];
-
-        if (prevTrack) {
-            setCurrentTrack(prevTrack);
-            addToRecentPlays(prevTrack);
-            setIsPlaying(true);
-            await musicPlayer.play(prevTrack);
-        }
+        logger.info('Skipping to previous track');
+        await playPrevious();
     };
 
     const handleFavorite = () => {
@@ -163,12 +148,19 @@ const PlayerScreen = ({ navigation }: any) => {
         }
     };
 
+    const toggleShuffleMode = () => {
+        logger.info('Toggling shuffle mode', { from: shuffle, to: !shuffle });
+        toggleShuffle();
+    };
+
     const isFav = currentTrack ? isFavorite(currentTrack.id) : false;
 
     const cycleRepeatMode = () => {
+        logger.info('Cycling repeat mode', { currentMode: repeatMode });
         const modes: ('off' | 'track' | 'queue')[] = ['off', 'track', 'queue'];
         const currentIndex = modes.indexOf(repeatMode);
         const nextMode = modes[(currentIndex + 1) % modes.length];
+        logger.info('Repeat mode changed', { from: repeatMode, to: nextMode });
         setRepeatMode(nextMode);
     };
 
@@ -227,14 +219,11 @@ const PlayerScreen = ({ navigation }: any) => {
                         onNext={skipToNext}
                         onPrev={skipToPrevious}
                         shuffle={shuffle}
-                        onToggleShuffle={toggleShuffle}
+                        onToggleShuffle={toggleShuffleMode}
                         repeatMode={repeatMode}
                         onCycleRepeat={cycleRepeatMode}
-                    />
-
-                    <PlayerFooter
                         isDownloaded={downloads.includes(currentTrack.id)}
-                        onToggleDownload={() => toggleDownload(currentTrack.id)}
+                        onToggleDownload={() => toggleDownload(currentTrack)}
                     />
 
                     {similarSongs.length > 0 && (

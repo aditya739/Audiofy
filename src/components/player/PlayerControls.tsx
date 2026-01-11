@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat } from 'lucide-react-native';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Download } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { usePlayerStore } from '../../store/usePlayerStore';
 
@@ -13,6 +13,8 @@ interface PlayerControlsProps {
     onToggleShuffle: () => void;
     repeatMode: 'off' | 'track' | 'queue';
     onCycleRepeat: () => void;
+    isDownloaded: boolean;
+    onToggleDownload: () => void;
 }
 
 const PlayerControls = ({
@@ -23,7 +25,9 @@ const PlayerControls = ({
     shuffle,
     onToggleShuffle,
     repeatMode,
-    onCycleRepeat
+    onCycleRepeat,
+    isDownloaded,
+    onToggleDownload
 }: PlayerControlsProps) => {
     const { theme } = usePlayerStore();
     const colors = {
@@ -33,46 +37,62 @@ const PlayerControls = ({
     };
 
     return (
-        <View style={styles.controls}>
-            <TouchableOpacity onPress={onToggleShuffle}>
-                <Shuffle size={24} color={shuffle ? colors.accent : colors.textSub} />
-            </TouchableOpacity>
+        <View style={styles.container}>
+            <View style={styles.controls}>
+                <TouchableOpacity onPress={onToggleShuffle}>
+                    <Shuffle size={24} color={shuffle ? colors.accent : colors.textSub} />
+                </TouchableOpacity>
 
-            <TouchableOpacity onPress={onPrev}>
-                <SkipBack size={36} color={colors.text} fill={colors.text} />
-            </TouchableOpacity>
+                <TouchableOpacity onPress={onPrev}>
+                    <SkipBack size={36} color={colors.text} fill={colors.text} />
+                </TouchableOpacity>
 
-            <TouchableOpacity onPress={onTogglePlay} style={styles.playButton}>
-                <LinearGradient
-                    colors={['#1ed760', '#1db954']}
-                    style={styles.playGradient}
+                <TouchableOpacity onPress={onTogglePlay} style={styles.playButton}>
+                    <LinearGradient
+                        colors={['#1ed760', '#1db954']}
+                        style={styles.playGradient}
+                    >
+                        {isPlaying ? (
+                            <Pause size={32} color="#000" fill="#000" />
+                        ) : (
+                            <Play size={32} color="#000" fill="#000" style={{ marginLeft: 4 }} />
+                        )}
+                    </LinearGradient>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={onNext}>
+                    <SkipForward size={36} color={colors.text} fill={colors.text} />
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={onCycleRepeat}>
+                    <Repeat size={24} color={repeatMode !== 'off' ? colors.accent : colors.textSub} />
+                    {repeatMode === 'track' && <View style={styles.repeatBadge}><Text style={styles.repeatBadgeText}>1</Text></View>}
+                </TouchableOpacity>
+            </View>
+
+            <View style={styles.secondaryControls}>
+                <TouchableOpacity
+                    onPress={onToggleDownload}
+                    style={[styles.downloadBtn, isDownloaded && styles.downloadedBtn]}
                 >
-                    {isPlaying ? (
-                        <Pause size={32} color="#000" fill="#000" />
-                    ) : (
-                        <Play size={32} color="#000" fill="#000" style={{ marginLeft: 4 }} />
-                    )}
-                </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={onNext}>
-                <SkipForward size={36} color={colors.text} fill={colors.text} />
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={onCycleRepeat}>
-                <Repeat size={24} color={repeatMode !== 'off' ? colors.accent : colors.textSub} />
-                {repeatMode === 'track' && <View style={styles.repeatBadge}><Text style={styles.repeatBadgeText}>1</Text></View>}
-            </TouchableOpacity>
+                    <Download size={20} color={isDownloaded ? '#1DB954' : colors.text} />
+                    <Text style={[styles.downloadText, { color: isDownloaded ? '#1DB954' : colors.text }]}>
+                        {isDownloaded ? 'Downloaded' : 'Download'}
+                    </Text>
+                </TouchableOpacity>
+            </View>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
+    container: {
+        marginTop: 20,
+    },
     controls: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginTop: 20,
     },
     playButton: {
         width: 72,
@@ -105,6 +125,27 @@ const styles = StyleSheet.create({
         fontSize: 9,
         fontWeight: 'bold',
         color: '#000',
+    },
+    secondaryControls: {
+        marginTop: 20,
+        alignItems: 'center',
+    },
+    downloadBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#888',
+    },
+    downloadedBtn: {
+        borderColor: '#1DB954',
+        backgroundColor: 'rgba(29, 185, 84, 0.1)',
+    },
+    downloadText: {
+        fontWeight: '600',
+        marginLeft: 8,
     },
 });
 

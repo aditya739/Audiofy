@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Download } from 'lucide-react-native';
+import Logger from '../../utils/Logger';
+
+const logger = Logger.getInstance('PlayerFooter');
 
 interface PlayerFooterProps {
     isDownloaded: boolean;
@@ -8,6 +11,10 @@ interface PlayerFooterProps {
 }
 
 const PlayerFooter = ({ isDownloaded, onToggleDownload }: PlayerFooterProps) => {
+    useEffect(() => {
+        logger.debug('PlayerFooter Rendered', { isDownloaded });
+    }, [isDownloaded]);
+
     return (
         <View style={styles.footerActions}>
             <TouchableOpacity

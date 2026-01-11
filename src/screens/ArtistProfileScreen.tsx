@@ -45,7 +45,7 @@ const ArtistProfileScreen = ({ route, navigation }: any) => {
     }, [artistId]);
 
     const loadData = async () => {
-        console.log('🎭 [ArtistProfileScreen] loadData() called for artist:', artistName, 'ID:', artistId);
+
         setLoading(true);
         try {
             const [details, artistSongs] = await Promise.all([
@@ -55,21 +55,22 @@ const ArtistProfileScreen = ({ route, navigation }: any) => {
 
             // If API returned songs, use them
             if (artistSongs && artistSongs.length > 0) {
-                console.log('🎭 [ArtistProfileScreen] Data loaded - Details:', !!details, 'Songs:', artistSongs.length);
+
                 setArtistData(details);
                 setSongs(artistSongs);
             } else {
                 // Fallback: Search for songs by artist name
-                console.log('⚠️ [ArtistProfileScreen] No songs from API, searching by artist name:', artistName);
+
                 const { searchSongs } = require('../api/saavn');
                 const searchResults = await searchSongs(artistName);
 
                 // Filter results to only include songs by this artist
-                const filteredSongs = searchResults.filter((song: any) =>
-                    song.primaryArtists?.toLowerCase().includes(artistName.toLowerCase())
-                );
+                const filteredSongs = searchResults.filter((song: any) => {
+                    const primary = song.primaryArtists || song.artists?.primary?.[0]?.name || '';
+                    return primary.toLowerCase().includes(artistName.toLowerCase());
+                });
 
-                console.log('✅ [ArtistProfileScreen] Fallback search found', filteredSongs.length, 'songs');
+
                 setArtistData(details);
                 setSongs(filteredSongs);
             }
@@ -77,13 +78,14 @@ const ArtistProfileScreen = ({ route, navigation }: any) => {
             console.error('❌ [ArtistProfileScreen] loadData() error:', e);
             // Last resort: try searching by artist name
             try {
-                console.log('🔄 [ArtistProfileScreen] Attempting final fallback search');
+
                 const { searchSongs } = require('../api/saavn');
                 const searchResults = await searchSongs(artistName);
-                const filteredSongs = searchResults.filter((song: any) =>
-                    song.primaryArtists?.toLowerCase().includes(artistName.toLowerCase())
-                );
-                console.log('✅ [ArtistProfileScreen] Final fallback found', filteredSongs.length, 'songs');
+                const filteredSongs = searchResults.filter((song: any) => {
+                    const primary = song.primaryArtists || song.artists?.primary?.[0]?.name || '';
+                    return primary.toLowerCase().includes(artistName.toLowerCase());
+                });
+
                 setSongs(filteredSongs);
             } catch (fallbackError) {
                 console.error('❌ [ArtistProfileScreen] All fallbacks failed:', fallbackError);
@@ -94,19 +96,19 @@ const ArtistProfileScreen = ({ route, navigation }: any) => {
     };
 
     const playSong = async (song: Song) => {
-        console.log('🎭 [ArtistProfileScreen] playSong() called for:', song.name);
+
         const track: TrackData = {
             id: song.id,
             url: song.downloadUrl[song.downloadUrl.length - 1].link || song.downloadUrl[song.downloadUrl.length - 1].url || '',
             title: song.name,
-            artist: artistName || (song.primaryArtists || 'Artist').toString().split(',')[0],
-            artistId: (artistId || (song.primaryArtistsId || '').toString().split(',')[0] || '').toString(),
+            artist: artistName || song.primaryArtists || song.artists?.primary?.[0]?.name || 'Artist',
+            artistId: (artistId || song.primaryArtistsId || song.artists?.primary?.[0]?.id || '').toString(),
             artwork: song.image[song.image.length - 1]?.url || '',
             album: song.album.name,
             duration: Number(song.duration),
         };
 
-        console.log('🎭 [ArtistProfileScreen] Setting track:', track.title, 'ID:', track.id);
+
         setCurrentTrack(track);
         addToQueue(track);
         addToRecentPlays(track);

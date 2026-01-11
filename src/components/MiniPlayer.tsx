@@ -5,14 +5,34 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { musicPlayer } from '../services/MusicPlayer';
 import { useSafeProgress } from '../hooks/usePlayer';
+import Logger from '../utils/Logger';
+import { ErrorHandler } from '../utils/ErrorHandler';
 
+const logger = Logger.getInstance('MiniPlayer');
 const { width } = Dimensions.get('window');
 
+/**
+ * MiniPlayer Component
+ * Persistent mini player bar that stays at the bottom of the screen
+ * Synced with the full PlayerScreen - shares the same state
+ * 
+ * Features:
+ * - Shows current track info (artwork, title, artist)
+ * - Real-time progress bar
+ * - Play/Pause control
+ * - Skip to next track
+ * - Tap to open full player
+ * - Synced with PlayerScreen via Zustand store
+ */
 const MiniPlayer = ({ navigation }: any) => {
-    const { currentTrack, isPlaying, setIsPlaying, theme } = usePlayerStore();
+    const { currentTrack, isPlaying, setIsPlaying, theme, playNext } = usePlayerStore();
     const progress = useSafeProgress();
 
-    if (!currentTrack) return null;
+    // Don't show mini player if no track is playing
+    if (!currentTrack) {
+        logger.debug('No current track, hiding mini player');
+        return null;
+    }
 
     const colors = {
         bg: theme === 'dark' ? '#1a1a1a' : '#f8f8f8',
@@ -23,48 +43,56 @@ const MiniPlayer = ({ navigation }: any) => {
     };
 
     const togglePlayback = async () => {
-        const nextState = !isPlaying;
-        setIsPlaying(nextState);
-        await musicPlayer.toggle(isPlaying);
+        logger.info('Toggle playback from mini player', {
+            currentState: isPlaying ? 'playing' : 'paused'
+        });
+
+        try {
+            const nextState = !isPlaying;
+            setIsPlaying(nextState);
+            await musicPlayer.toggle(isPlaying);
+
+            logger.debug('Playback toggled successfully', {
+                newState: nextState ? 'playing' : 'paused'
+            });
+        } catch (error) {
+            logger.error('Failed to toggle playback', error);
+            ErrorHandler.handle(error, 'MiniPlayer.togglePlayback');
+        }
     };
 
     const handleNext = async () => {
-        const { queue, currentTrack, setCurrentTrack, setIsPlaying, addToRecentPlays, shuffle } = usePlayerStore.getState();
-        if (queue.length === 0 || !currentTrack) return;
-
-        const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
-        let nextTrack;
-
-        if (shuffle) {
-            const randomIndex = Math.floor(Math.random() * queue.length);
-            nextTrack = queue[randomIndex];
-        } else {
-            const nextIndex = (currentIndex + 1) % queue.length;
-            nextTrack = queue[nextIndex];
-        }
-
-        if (nextTrack) {
-            setCurrentTrack(nextTrack);
-            addToRecentPlays(nextTrack);
-            setIsPlaying(true);
-            await musicPlayer.play(nextTrack);
+        logger.info('Skip to next track from mini player');
+        try {
+            await playNext(false);
+        } catch (error) {
+            logger.error('Failed to skip to next track', error);
+            ErrorHandler.handle(error, 'MiniPlayer.handleNext');
         }
     };
+
+    const openFullPlayer = () => {
+        logger.info('Opening full player screen');
+        navigation.navigate('Player');
+    };
+
+    // Calculate progress percentage
+    const progressPercentage = (progress.position / progress.duration) * 100 || 0;
 
     return (
         <View style={styles.outerContainer}>
             <TouchableOpacity
                 style={[styles.container, { backgroundColor: colors.bg }]}
-                activeOpacity={1}
-                onPress={() => navigation.navigate('Player')}
+                activeOpacity={0.8}
+                onPress={openFullPlayer}
             >
-                {/* Progress Bar */}
+                {/* Progress Bar - Synced with PlayerScreen */}
                 <View style={[styles.progressBarBg, { backgroundColor: colors.progressBg }]}>
                     <View
                         style={[
                             styles.progressBarFill,
                             {
-                                width: `${(progress.position / progress.duration) * 100 || 0}%`,
+                                width: `${progressPercentage}%`,
                                 backgroundColor: colors.accent,
                             },
                         ]}
@@ -81,7 +109,7 @@ const MiniPlayer = ({ navigation }: any) => {
                         </View>
                     )}
 
-                    {/* Track Info */}
+                    {/* Track Info - Synced with PlayerScreen */}
                     <View style={styles.info}>
                         <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
                             {currentTrack.title}
@@ -91,16 +119,24 @@ const MiniPlayer = ({ navigation }: any) => {
                         </Text>
                     </View>
 
-                    {/* Controls */}
+                    {/* Controls - Synced with PlayerScreen */}
                     <View style={styles.controls}>
-                        <TouchableOpacity onPress={togglePlayback} style={styles.playButton}>
+                        <TouchableOpacity
+                            onPress={togglePlayback}
+                            style={styles.playButton}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
                             {isPlaying ? (
                                 <Pause size={28} color={colors.text} fill={colors.text} />
                             ) : (
                                 <Play size={28} color={colors.text} fill={colors.text} />
                             )}
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={handleNext} style={styles.nextButton}>
+                        <TouchableOpacity
+                            onPress={handleNext}
+                            style={styles.nextButton}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
                             <SkipForward size={24} color={colors.text} />
                         </TouchableOpacity>
                     </View>
@@ -189,3 +225,4 @@ const styles = StyleSheet.create({
 });
 
 export default MiniPlayer;
+
